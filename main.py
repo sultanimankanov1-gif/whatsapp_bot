@@ -55,7 +55,7 @@ def ask_ai(campaign_id: str, user_message: str) -> str:
     
     try:
         response = ai_client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=prompt,
         )
         return response.text
