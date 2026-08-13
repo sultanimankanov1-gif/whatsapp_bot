@@ -19,7 +19,6 @@ GREEN_API_URL = (
     f"https://api.green-api.com/waInstance{GREEN_API_INSTANCE_ID}"
 )
 
-# Хранилище сессий клиентов: {"номер_телефона": "код_товара"}
 user_sessions = {}
 
 
@@ -27,7 +26,6 @@ user_sessions = {}
 # ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 # ==========================================
 def load_products():
-  """Загрузка базы товаров из JSON файла"""
   try:
     with open("products.json", "r", encoding="utf-8") as f:
       return json.load(f)
@@ -40,7 +38,6 @@ PRODUCTS_DB = load_products()
 
 
 def send_whatsapp_message(chat_id: str, text: str):
-  """Отправка текстового сообщения в WhatsApp через Green API"""
   url = f"{GREEN_API_URL}/sendMessage/{GREEN_API_TOKEN}"
   payload = {"chatId": chat_id, "message": text}
   headers = {"Content-Type": "application/json"}
@@ -51,7 +48,6 @@ def send_whatsapp_message(chat_id: str, text: str):
 
 
 def detect_campaign(message_text: str):
-  """Определяем, по какому товару/ключевому слову пишет клиент"""
   text_lower = message_text.lower()
   for campaign_id, data in PRODUCTS_DB.items():
     keywords = data.get("trigger_keywords", [])
@@ -62,28 +58,24 @@ def detect_campaign(message_text: str):
 
 
 def ask_ai(campaign_id: str, user_message: str) -> str:
-  """Запрос к Gemini ИИ через прямой REST API без зависимостей от SDK"""
   product_data = PRODUCTS_DB.get(campaign_id)
   if not product_data:
     return "Спасибо за обращение! Наш менеджер скоро ответит вам."
 
   system_instruction = product_data["system_prompt"]
 
-  # Используем прямое обращение к API Google
-  url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+  # ИСПОЛЬЗУЕМ СТАБИЛЬНЫЙ v1 ЕНДПОИНТ И МОДЕЛЬ gemini-2.5-flash
+  url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
   payload = {
-      "contents": [
-          {
-              "role": "user",
-              "parts": [{
-                  "text": (
-                      f"{system_instruction}\n\nВопрос"
-                      f" клиента: {user_message}"
-                  )
-              }],
-          }
-      ]
+      "contents": [{
+          "role": "user",
+          "parts": [{
+              "text": (
+                  f"{system_instruction}\n\nВопрос клиента: {user_message}"
+              )
+          }],
+      }]
   }
 
   headers = {"Content-Type": "application/json"}
@@ -108,7 +100,7 @@ def ask_ai(campaign_id: str, user_message: str) -> str:
 
 
 # ==========================================
-# ВЕБХУК ДЛЯ ПРИЕМА СООБЩЕНИЙ С WHATSAPP
+# ВЕБХУК
 # ==========================================
 @app.post("/webhook")
 async def receive_whatsapp(request: Request):
@@ -129,20 +121,16 @@ async def receive_whatsapp(request: Request):
     if not text_message or not chat_id:
       return {"status": "ignored"}
 
-    # 1. Проверяем, есть ли ключевое слово товара в сообщении
     new_campaign = detect_campaign(text_message)
     if new_campaign:
       user_sessions[chat_id] = new_campaign
 
-    # 2. Достаем текущую тему диалога
     current_campaign = user_sessions.get(chat_id)
 
-    # 3. Если тема определена — генерируем ответ через Gemini
     if current_campaign:
       ai_response = ask_ai(current_campaign, text_message)
       send_whatsapp_message(chat_id, ai_response)
     else:
-      # Сообщение без ключевого слова и без активной сессии
       send_whatsapp_message(
           chat_id, "Саламатсызбы! Бир аздан соң маалымат беребиз..."
       )
