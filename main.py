@@ -309,286 +309,254 @@ Smeg, кухонную технику и посуду.
 
 # ==========================================
 
-def ask_ai(
+def ask_ai(campaign_id, user_message):
 
-    campaign_id: str,
-
-    user_message: str
-
-):
+    print("")
+    print("==========================================")
+    print("ЗАПУСК GEMINI")
+    print("==========================================")
 
     if not GEMINI_API_KEY:
+        print("ОШИБКА: GEMINI_API_KEY отсутствует")
+        return "Саламатсызбы! Азыр техникалык көйгөй болуп жатат."
 
-        print(
+    product = PRODUCTS_DB.get(campaign_id) if campaign_id else None
 
-            "ОШИБКА: GEMINI_API_KEY отсутствует"
+    if product:
+        product_name = product.get("product_name", "")
+        original_prompt = product.get("system_prompt", "")
+    else:
+        product_name = ""
+        original_prompt = ""
 
-        )
+    # =====================================================
+    # ЖЁСТКИЕ ПРАВИЛА ДЛЯ AI
+    # =====================================================
 
-        return (
+    language_rules = """
+ТЫ — ПРОДАЮЩИЙ МЕНЕДЖЕР МАГАЗИНА PERIZAT.OPTOM.
 
-            "Саламатсызбы! "
+ОЧЕНЬ ВАЖНЫЕ ПРАВИЛА:
 
-            "Азыр техникалык көйгөй болуп жатат."
+1. ОПРЕДЕЛЯЙ ЯЗЫК КЛИЕНТА ПО ЕГО ПОСЛЕДНЕМУ СООБЩЕНИЮ.
 
-        )
+2. ЕСЛИ КЛИЕНТ ПИШЕТ НА КЫРГЫЗСКОМ —
+ОТВЕЧАЙ ТОЛЬКО НА КЫРГЫЗСКОМ.
 
-    # --------------------------------------
+Используй естественный разговорный кыргызский язык,
+как настоящий кыргызстанский продавец в WhatsApp.
 
-    # Если товар найден
+НЕ переходи на русский без причины.
+НЕ пиши смешанный русский-кыргызский текст.
+НЕ используй странный машинный кыргызский.
 
-    # --------------------------------------
+3. ЕСЛИ КЛИЕНТ ПИШЕТ НА РУССКОМ —
+ОТВЕЧАЙ НА РУССКОМ.
 
-    if campaign_id:
+4. ЕСЛИ КЛИЕНТ СПРАШИВАЕТ ЦЕНУ —
+ОБЯЗАТЕЛЬНО НАЗОВИ ЦЕНУ.
 
-        product_data = PRODUCTS_DB.get(
+НЕЛЬЗЯ отвечать:
+"Цена зависит от модели"
+"Уточню цену"
+"Могу рассказать подробнее"
 
-            campaign_id
+если точная цена уже есть в информации о товаре.
 
-        )
+5. НИКОГДА НЕ ПРИДУМЫВАЙ ЦЕНЫ.
 
-        if product_data:
+Используй ТОЛЬКО цены, которые указаны в информации
+о товарах ниже.
 
-            system_instruction = (
+6. Если клиент спрашивает несколько товаров —
+назови цены на каждый известный товар.
 
-                product_data.get(
+7. Если клиент хочет купить —
+подводи к заказу.
 
-                    "system_prompt",
+Для доставки уточняй:
+- имя
+- номер телефона
+- город/адрес
 
-                    GENERAL_SYSTEM_PROMPT
+8. Не говори клиенту, что ты AI или бот.
 
-                )
+9. Отвечай коротко и по делу.
+WhatsApp-сообщение должно выглядеть как сообщение
+живого менеджера.
 
-            )
+10. Если клиент просто поздоровался —
+поздоровайся и спроси, какой товар его интересует.
+"""
 
-            product_name = product_data.get(
 
-                "product_name",
+    # =====================================================
+    # ИНФОРМАЦИЯ О ТОВАРЕ
+    # =====================================================
 
-                ""
+    if product:
 
-            )
+        product_information = f"""
+ИНФОРМАЦИЯ О ТОВАРЕ:
 
-        else:
+Название:
+{product_name}
 
-            system_instruction = (
+ИНСТРУКЦИЯ МЕНЕДЖЕРА:
+{original_prompt}
 
-                GENERAL_SYSTEM_PROMPT
+ЭТА ИНФОРМАЦИЯ ЯВЛЯЕТСЯ ИСТОЧНИКОМ ПРАВДЫ.
+Если в ней указана цена — обязательно используй
+эту цену при вопросе клиента о стоимости.
+"""
 
-            )
-
-            product_name = ""
 
     else:
 
-        # ----------------------------------
+        product_information = """
+КОНКРЕТНЫЙ ТОВАР ПОКА НЕ ОПРЕДЕЛЁН.
 
-        # Если товар НЕ найден
+Доступные товары:
 
-        # Всё равно запускаем AI
+Smeg:
+- Кухонный комбайн Smeg 9 в 1 — 21 000 сом
+- Электрический чайник Smeg — 5 000 сом
+- Чайник с терморегуляцией — 11 000 сом
 
-        # ----------------------------------
+Dyson Airstrait:
+- Dyson Airstrait — 6 500 сом
 
-        system_instruction = (
+Dyson 09:
+- Dyson 09 — 13 000 сом
 
-            GENERAL_SYSTEM_PROMPT
+Dyson 08:
+- Dyson 08 — 11 500 сом
 
-        )
+Dyson 05:
+- Dyson 05 — 7 500 сом
 
-        product_name = ""
+Кухонная техника:
+- Тостер — 11 000 сом
+- Кухонные весы — 8 000 сом
+- Блендер — 3 500 сом
 
-    # --------------------------------------
+Посуда:
+- Набор ножей — 5 000 сом
+- Набор ложек и вилок — 7 000 сом
+- Чугунный казан — 5 000 сом
+- Чугунная сковородка — 5 000 сом
+- Каменная доска 3 в 1 — 9 000 сом
+- Деревянная доска — 1 500 сом
+- Термос — 1 100 сом
 
-    # Формируем prompt
-
-    # --------------------------------------
-
-    prompt_text = f"""
-
-{system_instruction}
-
+Если клиент спрашивает цену конкретного товара,
+назови соответствующую цену.
 """
 
-    if product_name:
 
-        prompt_text += f"""
+    # =====================================================
+    # ФИНАЛЬНЫЙ PROMPT
+    # =====================================================
 
-ТОВАР, КОТОРЫМ СЕЙЧАС ИНТЕРЕСУЕТСЯ КЛИЕНТ:
+    prompt = f"""
+{language_rules}
 
-{product_name}
-
-"""
-
-    prompt_text += f"""
+{product_information}
 
 СООБЩЕНИЕ КЛИЕНТА:
-
 {user_message}
 
-Ответь клиенту прямо сейчас.
+Теперь ответь клиенту.
 
+Если клиент спросил цену —
+сначала назови точную цену.
+
+Если клиент пишет на кыргызском —
+ответ должен быть полностью на кыргызском.
+
+Если клиент готов купить —
+запроси данные для оформления доставки.
 """
 
-    # --------------------------------------
 
-    # Gemini
+    # =====================================================
+    # GEMINI API
+    # =====================================================
 
-    # --------------------------------------
-
-    model_name = "gemini-3.6-flash"
+    model = "gemini-3.6-flash"
 
     url = (
-
         "https://generativelanguage.googleapis.com/"
-
-        f"v1beta/models/{model_name}:generateContent"
-
+        f"v1beta/models/{model}:generateContent"
     )
 
     payload = {
-
         "contents": [
-
             {
-
                 "role": "user",
-
                 "parts": [
-
                     {
-
-                        "text": prompt_text
-
+                        "text": prompt
                     }
-
                 ]
-
             }
-
         ],
-
         "generationConfig": {
-
-            "maxOutputTokens": 500
-
+            "maxOutputTokens": 500,
+            "temperature": 0.3
         }
-
     }
 
     headers = {
-
         "Content-Type": "application/json",
-
         "x-goog-api-key": GEMINI_API_KEY
-
     }
 
-    print(
-
-        "=========================================="
-
-    )
-
-    print(
-
-        "ОТПРАВЛЯЕМ ЗАПРОС В GEMINI"
-
-    )
-
-    print(
-
-        f"Модель: {model_name}"
-
-    )
-
-    print(
-
-        f"Campaign: {campaign_id}"
-
-    )
-
-    print(
-
-        f"Сообщение: {user_message}"
-
-    )
+    print("Отправляем запрос Gemini...")
+    print(f"CAMPAIGN: {campaign_id}")
+    print(f"CLIENT: {user_message}")
 
     try:
 
         response = requests.post(
-
             url,
-
             json=payload,
-
             headers=headers,
-
-            timeout=30
-
+            timeout=40
         )
 
         print(
-
-            f"GEMINI STATUS: "
-
-            f"{response.status_code}"
-
-        )
-
-        print(
-
-            f"GEMINI RESPONSE: "
-
-            f"{response.text}"
-
+            f"GEMINI STATUS: {response.status_code}"
         )
 
         if response.status_code != 200:
 
+            print(
+                f"GEMINI ERROR: {response.text}"
+            )
+
             return (
-
                 "Саламатсызбы! "
-
-                "Бир аздан соң менеджер "
-
-                "сизге жооп берет."
-
+                "Бир аздан соң менеджер жооп берет."
             )
 
         data = response.json()
 
         candidates = data.get(
-
             "candidates",
-
             []
-
         )
 
         if not candidates:
-
-            print(
-
-                "Gemini не вернул candidates"
-
-            )
-
             return (
-
                 "Саламатсызбы! "
-
                 "Бир аздан соң маалымат беребиз."
-
             )
 
         parts = (
-
             candidates[0]
-
             .get("content", {})
-
             .get("parts", [])
-
         )
 
         for part in parts:
@@ -597,38 +565,20 @@ def ask_ai(
 
             if text:
 
-                print(
-
-                    "GEMINI ОТВЕТ:"
-
-                )
-
+                print("GEMINI RESPONSE:")
                 print(text)
 
                 return text.strip()
 
-        print(
-
-            "Gemini вернул ответ без текста"
-
-        )
-
-    except Exception as e:
+    except Exception as error:
 
         print(
-
-            f"ОШИБКА GEMINI: {e}"
-
+            f"ОШИБКА GEMINI: {error}"
         )
 
     return (
-
         "Саламатсызбы! "
-
-        "Бир аздан соң менеджер "
-
-        "сизге жооп берет."
-
+        "Бир аздан соң менеджер жооп берет."
     )
 
 # ==========================================
