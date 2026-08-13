@@ -679,7 +679,7 @@ def ask_ai(
 
     url = (
         "https://generativelanguage.googleapis.com/"
-        "v1beta/interactions"
+        "v1/interactions"
     )
 
 
