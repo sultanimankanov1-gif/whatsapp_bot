@@ -75,6 +75,7 @@ def ask_ai(campaign_id: str, user_message: str) -> str:
   prompt = f"{system_instruction}\n\nВопрос клиента: {user_message}"
 
   try:
+    # Используем актуальную модель gemini-2.5-flash
     response = ai_client.models.generate_content(
         model="gemini-2.5-flash", contents=prompt
     )
