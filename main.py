@@ -73,7 +73,7 @@ def ask_ai(campaign_id: str, user_message: str) -> str:
   }
 
   # Список точных имен моделей БЕЗ префикса "models/"
-  models = ["gemini-2.5-flash", "gemini-3.6-flash"]
+  models = ["gemini-3.6-flash", "gemini-3.6-flash"]
 
   for model_name in models:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
