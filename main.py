@@ -2,7 +2,6 @@ import json
 import os
 import requests
 from fastapi import FastAPI, Request
-from google import genai
 from uvicorn import run
 
 app = FastAPI()
@@ -19,9 +18,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GREEN_API_URL = (
     f"https://api.green-api.com/waInstance{GREEN_API_INSTANCE_ID}"
 )
-
-# Инициализация ИИ Gemini
-ai_client = genai.Client(api_key=GEMINI_API_KEY)
 
 # Хранилище сессий клиентов: {"номер_телефона": "код_товара"}
 user_sessions = {}
@@ -66,27 +62,47 @@ def detect_campaign(message_text: str):
 
 
 def ask_ai(campaign_id: str, user_message: str) -> str:
-  """Запрос к Gemini ИИ для формирования ответа клиенту"""
+  """Запрос к Gemini ИИ через прямой REST API без зависимостей от SDK"""
   product_data = PRODUCTS_DB.get(campaign_id)
   if not product_data:
     return "Спасибо за обращение! Наш менеджер скоро ответит вам."
 
   system_instruction = product_data["system_prompt"]
-  prompt = f"{system_instruction}\n\nВопрос клиента: {user_message}"
 
-  # Список приоритетных моделей для гарантии работы
-  models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+  # Используем прямое обращение к API Google
+  url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
 
-  for model_name in models_to_try:
-    try:
-      response = ai_client.models.generate_content(
-          model=model_name, contents=prompt
-      )
-      if response and response.text:
-        return response.text
-    except Exception as e:
-      print(f"Ошибка ИИ при вызове {model_name}: {e}")
-      continue
+  payload = {
+      "contents": [
+          {
+              "role": "user",
+              "parts": [{
+                  "text": (
+                      f"{system_instruction}\n\nВопрос"
+                      f" клиента: {user_message}"
+                  )
+              }],
+          }
+      ]
+  }
+
+  headers = {"Content-Type": "application/json"}
+
+  try:
+    response = requests.post(url, json=payload, headers=headers, timeout=15)
+    res_data = response.json()
+
+    if response.status_code == 200:
+      candidates = res_data.get("candidates", [])
+      if candidates:
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if parts:
+          return parts[0].get("text", "")
+    else:
+      print(f"Ошибка REST API Gemini ({response.status_code}): {res_data}")
+
+  except Exception as e:
+    print(f"Ошибка обращения к Gemini REST API: {e}")
 
   return "Саламатсызбы! Бир аздан соң маалымат беребиз..."
 
