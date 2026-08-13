@@ -74,15 +74,21 @@ def ask_ai(campaign_id: str, user_message: str) -> str:
   system_instruction = product_data["system_prompt"]
   prompt = f"{system_instruction}\n\nВопрос клиента: {user_message}"
 
-  try:
-    # Используем актуальную модель gemini-2.5-flash
-    response = ai_client.models.generate_content(
-        model="gemini-2.5-flash", contents=prompt
-    )
-    return response.text
-  except Exception as e:
-    print(f"Ошибка ИИ: {e}")
-    return "Саламатсызбы! Бир аздан соң маалымат беребиз..."
+  # Список приоритетных моделей для гарантии работы
+  models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+
+  for model_name in models_to_try:
+    try:
+      response = ai_client.models.generate_content(
+          model=model_name, contents=prompt
+      )
+      if response and response.text:
+        return response.text
+    except Exception as e:
+      print(f"Ошибка ИИ при вызове {model_name}: {e}")
+      continue
+
+  return "Саламатсызбы! Бир аздан соң маалымат беребиз..."
 
 
 # ==========================================
