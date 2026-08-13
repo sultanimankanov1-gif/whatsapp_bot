@@ -63,38 +63,34 @@ def ask_ai(campaign_id: str, user_message: str) -> str:
     return "Спасибо за обращение! Наш менеджер скоро ответит вам."
 
   system_instruction = product_data["system_prompt"]
-
-  # ИСПОЛЬЗУЕМ СТАБИЛЬНЫЙ v1 ЕНДПОИНТ И МОДЕЛЬ gemini-2.5-flash
-  url = f"https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-
-  payload = {
-      "contents": [{
-          "role": "user",
-          "parts": [{
-              "text": (
-                  f"{system_instruction}\n\nВопрос клиента: {user_message}"
-              )
-          }],
-      }]
-  }
+  prompt_text = f"{system_instruction}\n\nВопрос клиента: {user_message}"
 
   headers = {"Content-Type": "application/json"}
+  payload = {
+      "contents": [
+          {"role": "user", "parts": [{"text": prompt_text}]}
+      ]
+  }
 
-  try:
-    response = requests.post(url, json=payload, headers=headers, timeout=15)
-    res_data = response.json()
+  # Список точных имен моделей БЕЗ префикса "models/"
+  models = ["gemini-2.5-flash", "gemini-1.5-flash"]
 
-    if response.status_code == 200:
-      candidates = res_data.get("candidates", [])
-      if candidates:
-        parts = candidates[0].get("content", {}).get("parts", [])
-        if parts:
-          return parts[0].get("text", "")
-    else:
-      print(f"Ошибка REST API Gemini ({response.status_code}): {res_data}")
+  for model_name in models:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+    try:
+      response = requests.post(url, json=payload, headers=headers, timeout=15)
+      res_data = response.json()
 
-  except Exception as e:
-    print(f"Ошибка обращения к Gemini REST API: {e}")
+      if response.status_code == 200:
+        candidates = res_data.get("candidates", [])
+        if candidates:
+          parts = candidates[0].get("content", {}).get("parts", [])
+          if parts and parts[0].get("text"):
+            return parts[0].get("text")
+      else:
+        print(f"Ошибка {model_name} ({response.status_code}): {res_data}")
+    except Exception as e:
+      print(f"Сбой запроса к {model_name}: {e}")
 
   return "Саламатсызбы! Бир аздан соң маалымат беребиз..."
 
